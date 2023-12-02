@@ -112,7 +112,7 @@ func renderResults(body []byte, day int) string {
 	if err != nil {
 		panic("bad time zone")
 	}
-	dayStart := time.Date(2022, time.December, day, 0, 0, 0, 0, eastCoastLocation)
+	dayStart := time.Date(2023, time.December, day, 0, 0, 0, 0, eastCoastLocation)
 	// Just return the names that have at least one star on the day
 	var sb strings.Builder
 	const fmtString = "%-20s | %11v | %11v"
