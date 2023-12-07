@@ -14,9 +14,9 @@ import (
 // Part 2 answer: 249356515
 func main() {
 	fmt.Println("Advent of Code 2023, Day 7")
-	entries := common.ReadStringsFromFile("input.txt")
-	fmt.Printf("Part 1: %d\n", part1(entries))
-	fmt.Printf("Part 2: %d\n", part2(entries))
+	lines := common.ReadStringsFromFile("input.txt")
+	fmt.Printf("Part 1: %d\n", part1(lines))
+	fmt.Printf("Part 2: %d\n", part2(lines))
 }
 
 type entry struct {
@@ -24,39 +24,43 @@ type entry struct {
 	bid  int
 }
 
+// Hand ranks in increasing order
 const (
-	high      = iota
-	onePair   = iota
-	twoPair   = iota
-	three     = iota
-	fullHouse = iota
-	four      = iota
-	five      = iota
+	high = iota
+	onePair
+	twoPair
+	three
+	fullHouse
+	four
+	five
 )
 
-func part1(entries []string) int {
-	var allEntries []entry
-	for _, line := range entries {
+func part1(lines []string) int {
+	var entries []entry
+	for _, line := range lines {
 		groups := strings.Fields(line)
-		allEntries = append(allEntries, entry{hand: groups[0], bid: common.Atoi(groups[1])})
+		entries = append(entries, entry{hand: groups[0], bid: common.Atoi(groups[1])})
 	}
-	sort.Slice(allEntries, func(i, j int) bool {
-		handTypeLeft := classifyHand(allEntries[i].hand)
-		handTypeRight := classifyHand(allEntries[j].hand)
-		if handTypeLeft == handTypeRight {
-			for p := 0; p < 5; p++ {
-				cardValueLeft := cardValue(allEntries[i].hand[p])
-				cardValueRight := cardValue(allEntries[j].hand[p])
-				if cardValueLeft != cardValueRight {
-					return cardValueLeft < cardValueRight
-				}
-			}
-			panic("oops")
+	sort.Slice(entries, func(i, j int) bool {
+		handTypeLeft := classifyHand(entries[i].hand)
+		handTypeRight := classifyHand(entries[j].hand)
+		if handTypeLeft != handTypeRight {
+			return handTypeLeft < handTypeRight
 		}
-		return handTypeLeft < handTypeRight
+		// Same rank, so sort by first different card value
+		for p := 0; p < 5; p++ {
+			cardValueLeft := cardValue(entries[i].hand[p])
+			cardValueRight := cardValue(entries[j].hand[p])
+			if cardValueLeft != cardValueRight {
+				return cardValueLeft < cardValueRight
+			}
+		}
+		panic("equal hands")
+
 	})
+	// Now they are sorted in ascending order of strength
 	var total int
-	for i, e := range allEntries {
+	for i, e := range entries {
 		total += (i + 1) * e.bid
 	}
 	return total
@@ -116,35 +120,37 @@ func cardValue(b byte) int {
 	}
 }
 
-func part2(entries []string) int {
-	var allEntries []entry
-	for _, line := range entries {
+func part2(lines []string) int {
+	var entries []entry
+	for _, line := range lines {
 		groups := strings.Fields(line)
-		allEntries = append(allEntries, entry{hand: groups[0], bid: common.Atoi(groups[1])})
+		entries = append(entries, entry{hand: groups[0], bid: common.Atoi(groups[1])})
 	}
-	sort.Slice(allEntries, func(i, j int) bool {
-		handTypeLeft := classifyHand2(allEntries[i].hand)
-		handTypeRight := classifyHand2(allEntries[j].hand)
-		if handTypeLeft == handTypeRight {
-			for p := 0; p < 5; p++ {
-				cardValueLeft := cardValue2(allEntries[i].hand[p])
-				cardValueRight := cardValue2(allEntries[j].hand[p])
-				if cardValueLeft != cardValueRight {
-					return cardValueLeft < cardValueRight
-				}
-			}
-			panic("oops")
+	sort.Slice(entries, func(i, j int) bool {
+		handTypeLeft := classifyHandWithJokers(entries[i].hand)
+		handTypeRight := classifyHandWithJokers(entries[j].hand)
+		if handTypeLeft != handTypeRight {
+			return handTypeLeft < handTypeRight
 		}
-		return handTypeLeft < handTypeRight
+		// Same rank, so sort by first different card value
+		for p := 0; p < 5; p++ {
+			cardValueLeft := cardValueWithJokers(entries[i].hand[p])
+			cardValueRight := cardValueWithJokers(entries[j].hand[p])
+			if cardValueLeft != cardValueRight {
+				return cardValueLeft < cardValueRight
+			}
+		}
+		panic("equal hands")
+
 	})
+	// Now they are sorted in ascending order of strength
 	var total int
-	for i, e := range allEntries {
+	for i, e := range entries {
 		total += (i + 1) * e.bid
 	}
 	return total
 }
-
-func classifyHand2(hand string) int {
+func classifyHandWithJokers(hand string) int {
 	cards := make(map[byte]int)
 	for _, c := range []byte(hand) {
 		cards[c]++
@@ -194,25 +200,24 @@ func classifyHand2(hand string) int {
 			return three
 		}
 		return onePair
-	case 0:
-		if hasThree && twos == 1 {
-			return fullHouse
-		}
-		if hasThree {
-			return three
-		}
-		if twos == 2 {
-			return twoPair
-		}
-		if twos == 1 {
-			return onePair
-		}
-		return high
 	}
-	panic("oops")
+	// No jokers
+	if hasThree && twos == 1 {
+		return fullHouse
+	}
+	if hasThree {
+		return three
+	}
+	if twos == 2 {
+		return twoPair
+	}
+	if twos == 1 {
+		return onePair
+	}
+	return high
 }
 
-func cardValue2(b byte) int {
+func cardValueWithJokers(b byte) int {
 	switch b {
 	case 'A':
 		return 14
