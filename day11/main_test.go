@@ -26,3 +26,25 @@ func Test_part1(t *testing.T) {
 		})
 	}
 }
+
+func Test_findSolution(t *testing.T) {
+	type args struct {
+		g               common.Grid
+		expansionFactor int
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{"10x", args{common.ArraysGridFromLines(common.ReadStringsFromFile("testdata/example.txt")), 10}, 1030},
+		{"100x", args{common.ArraysGridFromLines(common.ReadStringsFromFile("testdata/example.txt")), 100}, 8410},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := findSolution(tt.args.g, tt.args.expansionFactor); got != tt.want {
+				t.Errorf("findSolution() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
