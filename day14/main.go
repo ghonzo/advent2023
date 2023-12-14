@@ -34,8 +34,9 @@ func move(g common.Grid, dir common.Point) int {
 	moved := 0
 	for p := range g.AllPoints() {
 		if g.Get(p) == 'O' {
-			if nv, ok := g.CheckedGet(p.Add(dir)); ok && nv == '.' {
-				g.Set(p.Add(dir), 'O')
+			adjacentSpace := p.Add(dir)
+			if adjacentValue, ok := g.CheckedGet(adjacentSpace); ok && adjacentValue == '.' {
+				g.Set(adjacentSpace, 'O')
 				g.Set(p, '.')
 				moved++
 			}
@@ -47,29 +48,32 @@ func move(g common.Grid, dir common.Point) int {
 func calculateLoad(g common.Grid) int {
 	var load int
 	height := g.Size().Y()
-	for x := 0; x < g.Size().X(); x++ {
-		for y := 0; y < height; y++ {
-			if g.Get(common.NewPoint(x, y)) == 'O' {
-				load += height - y
-			}
+	for p := range g.AllPoints() {
+		if g.Get(p) == 'O' {
+			load += height - p.Y()
 		}
 	}
 	return load
 }
 
+const goalCycle = 1000000000
+
 func part2(lines []string) int {
-	goalCycle := 1000000000
 	g := common.ArraysGridFromLines(lines)
 	var h maphash.Hash
+	// loads by cycle
 	var loads []int
 	// hash of grid pointing to cycle number
 	gridCycle := make(map[uint64]int)
 	for c := 0; ; c++ {
 		cycle(g)
-		h.WriteString(common.RenderGrid(g))
+		// Hash of the grid. We could be more efficient if we need to be
+		for p := range g.AllPoints() {
+			h.WriteByte(g.Get(p))
+		}
 		hash := h.Sum64()
 		if prevCycle, ok := gridCycle[hash]; ok {
-			// Okay we saw it before. Figure out the load for the
+			// Okay we saw it before. Figure out what the load will be with the goal cycle
 			cycleLength := c - prevCycle
 			targetIndex := goalCycle - 1 - prevCycle
 			return loads[(targetIndex%cycleLength)+prevCycle]
