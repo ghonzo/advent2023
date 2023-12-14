@@ -30,33 +30,21 @@ func part1(lines []string) int {
 	return total
 }
 
+// If we should ignore a score (for part 2), include it here. Otherwise 0 is fine
 func scoreForPattern(g common.Grid, omitScore int) int {
-	// Score -> sum of column
+	// Score (unique pattern) for each column and row
 	colScore := make([]uint64, g.Size().X())
-	for x := 0; x < g.Size().X(); x++ {
-		var score uint64
-		for y := 0; y < g.Size().Y(); y++ {
-			score <<= 1
-			if g.Get(common.NewPoint(x, y)) == '#' {
-				score++
-			}
+	rowScore := make([]uint64, g.Size().Y())
+	for p := range g.AllPoints() {
+		colScore[p.X()] <<= 1
+		rowScore[p.Y()] <<= 1
+		if g.Get(p) == '#' {
+			colScore[p.X()]++
+			rowScore[p.Y()]++
 		}
-		colScore[x] = score
 	}
 	if col, ok := findSymmetry(colScore, omitScore%100); ok {
 		return col
-	}
-	// Let's look for rows
-	rowScore := make([]uint64, g.Size().Y())
-	for y := 0; y < g.Size().Y(); y++ {
-		var score uint64
-		for x := 0; x < g.Size().X(); x++ {
-			score <<= 1
-			if g.Get(common.NewPoint(x, y)) == '#' {
-				score++
-			}
-		}
-		rowScore[y] = score
 	}
 	if row, ok := findSymmetry(rowScore, omitScore/100); ok {
 		return row * 100
@@ -64,6 +52,7 @@ func scoreForPattern(g common.Grid, omitScore int) int {
 	return 0
 }
 
+// If omit is non-zero, ignore that line of reflection
 func findSymmetry(scores []uint64, omit int) (int, bool) {
 	for i := 0; i < len(scores)-1; i++ {
 		if i == omit-1 {
@@ -76,6 +65,7 @@ func findSymmetry(scores []uint64, omit int) (int, bool) {
 		if slices.Equal(leftSlice, rightSlice) {
 			return i + 1, true
 		}
+		// Undo the reverse
 		slices.Reverse(leftSlice)
 	}
 	return 0, false
@@ -86,17 +76,17 @@ func part2(lines []string) int {
 	lastBlank := -1
 	for n, line := range append(lines, "") {
 		if len(line) == 0 {
-			total += scoreForPattern2(common.ArraysGridFromLines(lines[lastBlank+1 : n]))
+			total += scoreForSmudgePattern(common.ArraysGridFromLines(lines[lastBlank+1 : n]))
 			lastBlank = n
 		}
 	}
 	return total
 }
 
-func scoreForPattern2(g common.Grid) int {
+func scoreForSmudgePattern(g common.Grid) int {
 	// First figure out the original score
 	originalScore := scoreForPattern(g, 0)
-	// Now brute force variations
+	// Now brute force all smudge variations
 	for p := range g.AllPoints() {
 		v := g.Get(p)
 		if v == '.' {
@@ -104,8 +94,7 @@ func scoreForPattern2(g common.Grid) int {
 		} else {
 			g.Set(p, '.')
 		}
-		newScore := scoreForPattern(g, originalScore)
-		if newScore > 0 {
+		if newScore := scoreForPattern(g, originalScore); newScore > 0 {
 			return newScore
 		}
 		g.Set(p, v)
