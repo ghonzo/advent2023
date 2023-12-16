@@ -27,6 +27,9 @@ func part1(lines []string) int {
 	return calcEnergized(g, beam{pos: common.NewPoint(-1, 0), dir: common.R})
 }
 
+var forwardSlashMirror = map[common.Point]common.Point{common.U: common.R, common.R: common.U, common.D: common.L, common.L: common.D}
+var backSlashMirror = map[common.Point]common.Point{common.U: common.L, common.R: common.D, common.D: common.R, common.L: common.U}
+
 func calcEnergized(g common.Grid, initialBeam beam) int {
 	energized := make(map[common.Point]bool)
 	beamsSeen := make(map[beam]bool)
@@ -44,45 +47,22 @@ func calcEnergized(g common.Grid, initialBeam beam) int {
 		energized[b.pos] = true
 		beamsSeen[b] = true
 		switch v {
-		case '.':
-			beams = append(beams, b)
 		case '/':
-			switch b.dir {
-			case common.U:
-				b.dir = common.R
-			case common.R:
-				b.dir = common.U
-			case common.D:
-				b.dir = common.L
-			case common.L:
-				b.dir = common.D
-			}
-			beams = append(beams, b)
+			b.dir = forwardSlashMirror[b.dir]
 		case '\\':
-			switch b.dir {
-			case common.U:
-				b.dir = common.L
-			case common.R:
-				b.dir = common.D
-			case common.D:
-				b.dir = common.R
-			case common.L:
-				b.dir = common.U
-			}
-			beams = append(beams, b)
+			b.dir = backSlashMirror[b.dir]
 		case '|':
 			if b.dir == common.R || b.dir == common.L {
 				beams = append(beams, beam{pos: b.pos, dir: common.U}, beam{pos: b.pos, dir: common.D})
-			} else {
-				beams = append(beams, b)
+				continue
 			}
 		case '-':
 			if b.dir == common.U || b.dir == common.D {
 				beams = append(beams, beam{pos: b.pos, dir: common.R}, beam{pos: b.pos, dir: common.L})
-			} else {
-				beams = append(beams, b)
+				continue
 			}
 		}
+		beams = append(beams, b)
 	}
 	return len(energized)
 }
