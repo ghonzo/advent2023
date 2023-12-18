@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -11,7 +12,7 @@ import (
 
 // Day 18:
 // Part 1 answer: 62365
-// Part 2 answer:
+// Part 2 answer: 159485361249806
 func main() {
 	fmt.Println("Advent of Code 2023, Day 18")
 	lines := common.ReadStringsFromFile("input.txt")
@@ -104,26 +105,50 @@ func determineSpaceType(g common.Grid, x, y int) byte {
 var dirMap2 = map[byte]common.Point{'0': common.R, '1': common.D, '2': common.L, '3': common.U}
 
 func part2(lines []string) int {
-	// Keep a minmax for every row
-	mmRow := make(map[int]*common.MaxMin[int])
+	g := common.NewSparseGrid()
+	// For every row, keep a record of which x-coords are filled
+	rows := make(map[int][]int)
 	var p common.Point
 	for _, line := range lines {
 		index := strings.Index(line, "#")
 		dir := dirMap2[line[index+6]]
 		length, _ := strconv.ParseInt(line[index+1:index+6], 16, 0)
 		for i := 0; i < int(length); i++ {
-			mm, ok := mmRow[p.Y()]
-			if !ok {
-				mm = new(common.MaxMin[int])
-				mmRow[p.Y()] = mm
-			}
-			mm.Accept(p.X())
+			rows[p.Y()] = append(rows[p.Y()], p.X())
+			g.Set(p, '#')
 			p = p.Add(dir)
 		}
 	}
 	var total int
-	for _, v := range mmRow {
-		total += v.Max - v.Min + 1
+	for y, xcoords := range rows {
+		slices.Sort(xcoords)
+		interior := false
+		var lastElbow byte
+		var lastX int
+		for _, x := range xcoords {
+			spaceType := determineSpaceType(g, x, y)
+			if interior {
+				total += (x - lastX - 1)
+			}
+			switch spaceType {
+			case '|':
+				interior = !interior
+			case 'F', 'L':
+				lastElbow = spaceType
+			case 'J':
+				if lastElbow == 'F' {
+					interior = !interior
+				}
+				lastElbow = spaceType
+			case '7':
+				if lastElbow == 'L' {
+					interior = !interior
+				}
+				lastElbow = spaceType
+			}
+			lastX = x
+			total++
+		}
 	}
 	return total
 }
