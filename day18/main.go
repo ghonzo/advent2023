@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -105,50 +104,21 @@ func determineSpaceType(g common.Grid, x, y int) byte {
 var dirMap2 = map[byte]common.Point{'0': common.R, '1': common.D, '2': common.L, '3': common.U}
 
 func part2(lines []string) int {
-	g := common.NewSparseGrid()
-	// For every row, keep a record of which x-coords are filled
-	rows := make(map[int][]int)
+	var vertices []common.Point
 	var p common.Point
+	var total int
 	for _, line := range lines {
 		index := strings.Index(line, "#")
 		dir := dirMap2[line[index+6]]
 		length, _ := strconv.ParseInt(line[index+1:index+6], 16, 0)
-		for i := 0; i < int(length); i++ {
-			rows[p.Y()] = append(rows[p.Y()], p.X())
-			g.Set(p, '#')
-			p = p.Add(dir)
-		}
+		vertices = append(vertices, p)
+		// Edges count!
+		total += int(length)
+		p = p.Add(dir.Times(int(length)))
 	}
-	var total int
-	for y, xcoords := range rows {
-		slices.Sort(xcoords)
-		interior := false
-		var lastElbow byte
-		var lastX int
-		for _, x := range xcoords {
-			spaceType := determineSpaceType(g, x, y)
-			if interior {
-				total += (x - lastX - 1)
-			}
-			switch spaceType {
-			case '|':
-				interior = !interior
-			case 'F', 'L':
-				lastElbow = spaceType
-			case 'J':
-				if lastElbow == 'F' {
-					interior = !interior
-				}
-				lastElbow = spaceType
-			case '7':
-				if lastElbow == 'L' {
-					interior = !interior
-				}
-				lastElbow = spaceType
-			}
-			lastX = x
-			total++
-		}
+	for i := 0; i < len(vertices); i++ {
+		j := (i + 1) % len(vertices)
+		total += (vertices[i].Y() + vertices[j].Y()) * (vertices[i].X() - vertices[j].X())
 	}
-	return total
+	return total/2 + 1
 }
