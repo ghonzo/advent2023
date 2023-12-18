@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ghonzo/advent2023/common"
@@ -100,7 +101,20 @@ func determineSpaceType(g common.Grid, x, y int) byte {
 	panic("ugh")
 }
 
+var dirMap2 = map[byte]common.Point{'0': common.R, '1': common.D, '2': common.L, '3': common.U}
+
 func part2(lines []string) int {
-	var total int
-	return total
+	g := common.NewSparseGrid()
+	var p common.Point
+	// Set the trench
+	for _, line := range lines {
+		index := strings.Index(line, "#")
+		dir := dirMap2[line[index+6]]
+		length, _ := strconv.ParseInt(line[index+1:index+6], 16, 0)
+		for i := 0; i < int(length); i++ {
+			g.Set(p, '#')
+			p = p.Add(dir)
+		}
+	}
+	return calculateArea(g)
 }
