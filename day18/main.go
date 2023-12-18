@@ -104,17 +104,26 @@ func determineSpaceType(g common.Grid, x, y int) byte {
 var dirMap2 = map[byte]common.Point{'0': common.R, '1': common.D, '2': common.L, '3': common.U}
 
 func part2(lines []string) int {
-	g := common.NewSparseGrid()
+	// Keep a minmax for every row
+	mmRow := make(map[int]*common.MaxMin[int])
 	var p common.Point
-	// Set the trench
 	for _, line := range lines {
 		index := strings.Index(line, "#")
 		dir := dirMap2[line[index+6]]
 		length, _ := strconv.ParseInt(line[index+1:index+6], 16, 0)
 		for i := 0; i < int(length); i++ {
-			g.Set(p, '#')
+			mm, ok := mmRow[p.Y()]
+			if !ok {
+				mm = new(common.MaxMin[int])
+				mmRow[p.Y()] = mm
+			}
+			mm.Accept(p.X())
 			p = p.Add(dir)
 		}
 	}
-	return calculateArea(g)
+	var total int
+	for _, v := range mmRow {
+		total += v.Max - v.Min + 1
+	}
+	return total
 }
