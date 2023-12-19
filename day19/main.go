@@ -35,7 +35,13 @@ type workflow struct {
 
 type part map[string]int
 
-var ruleRegex = regexp.MustCompile(`(.)(.)(\d+):(.+)`)
+func (p part) sum() int {
+	var total int
+	for _, v := range p {
+		total += v
+	}
+	return total
+}
 
 func part1(lines []string) int {
 	workflows := make(map[string]workflow)
@@ -45,60 +51,71 @@ func part1(lines []string) int {
 		if len(line) == 0 {
 			break
 		}
-		leftIndex := strings.Index(line, "{")
-		wf := workflow{name: line[:leftIndex]}
-		ruleParts := strings.Split(line[leftIndex+1:len(line)-1], ",")
-		for _, ruleStr := range ruleParts[:len(ruleParts)-1] {
-			group := ruleRegex.FindStringSubmatch(ruleStr)
-			wf.rules = append(wf.rules, rule{group[1], group[2] == "<", common.Atoi(group[3]), group[4]})
-		}
-		wf.finalAction = ruleParts[len(ruleParts)-1]
+		wf := parseWorkflow(line)
 		workflows[wf.name] = wf
 	}
 	var total int
 	for _, line = range lines[lineNum+1:] {
-		p := make(part)
-		for _, rating := range strings.Split(line[1:len(line)-1], ",") {
-			p[rating[:1]] = common.Atoi(rating[2:])
-		}
+		p := parsePart(line)
 		total += processPart(p, workflows)
 	}
 	return total
 }
 
-func processPart(p part, workflows map[string]workflow) int {
-	var total int
-	if doWorkflow(p, workflows["in"], workflows) {
-		for _, v := range p {
-			total += v
-		}
+var ruleRegex = regexp.MustCompile(`(.)(.)(\d+):(.+)`)
+
+func parseWorkflow(s string) workflow {
+	leftBraceIndex := strings.Index(s, "{")
+	wf := workflow{name: s[:leftBraceIndex]}
+	ruleParts := strings.Split(s[leftBraceIndex+1:len(s)-1], ",")
+	for _, ruleStr := range ruleParts[:len(ruleParts)-1] {
+		group := ruleRegex.FindStringSubmatch(ruleStr)
+		wf.rules = append(wf.rules, rule{group[1], group[2] == "<", common.Atoi(group[3]), group[4]})
 	}
-	return total
+	wf.finalAction = ruleParts[len(ruleParts)-1]
+	return wf
 }
 
+func parsePart(s string) part {
+	p := make(part)
+	for _, rating := range strings.Split(s[1:len(s)-1], ",") {
+		p[rating[:1]] = common.Atoi(rating[2:])
+	}
+	return p
+}
+
+func processPart(p part, workflows map[string]workflow) int {
+	if doWorkflow(p, workflows["in"], workflows) {
+		return p.sum()
+	} else {
+		return 0
+	}
+}
+
+// Returns true if accepted, false if rejected
 func doWorkflow(p part, wf workflow, workflows map[string]workflow) bool {
 	for _, r := range wf.rules {
 		pv := p[r.category]
 		if (r.lessThan && pv < r.value) || (!r.lessThan && pv > r.value) {
-			switch r.action {
-			case "A":
-				return true
-			case "R":
-				return false
-			default:
-				return doWorkflow(p, workflows[r.action], workflows)
-			}
+			return processAction(p, r.action, workflows)
 		}
 	}
-	switch wf.finalAction {
+	// Else...
+	return processAction(p, wf.finalAction, workflows)
+}
+
+func processAction(p part, action string, workflows map[string]workflow) bool {
+	switch action {
 	case "A":
 		return true
 	case "R":
 		return false
 	default:
-		return doWorkflow(p, workflows[wf.finalAction], workflows)
+		return doWorkflow(p, workflows[action], workflows)
 	}
 }
+
+// PART 2 STUFF BELOW
 
 type ratingRange struct {
 	min, max int
@@ -106,14 +123,12 @@ type ratingRange struct {
 
 type partRatings map[string]ratingRange
 
-func (pr partRatings) totalCombos() uint64 {
-	// Through trial and error I figured out this fits ... I'm sure there's a real name for it!
-	// avgOverallSum * permutations
-	var permutations uint64 = 1
+func (pr partRatings) permutations() uint64 {
+	var p uint64 = 1
 	for _, rr := range pr {
-		permutations *= uint64(rr.max - rr.min + 1)
+		p *= uint64(rr.max - rr.min + 1)
 	}
-	return permutations
+	return p
 }
 
 func part2(lines []string) uint64 {
@@ -122,14 +137,7 @@ func part2(lines []string) uint64 {
 		if len(line) == 0 {
 			break
 		}
-		leftIndex := strings.Index(line, "{")
-		wf := workflow{name: line[:leftIndex]}
-		ruleParts := strings.Split(line[leftIndex+1:len(line)-1], ",")
-		for _, ruleStr := range ruleParts[:len(ruleParts)-1] {
-			group := ruleRegex.FindStringSubmatch(ruleStr)
-			wf.rules = append(wf.rules, rule{group[1], group[2] == "<", common.Atoi(group[3]), group[4]})
-		}
-		wf.finalAction = ruleParts[len(ruleParts)-1]
+		wf := parseWorkflow(line)
 		workflows[wf.name] = wf
 	}
 	fullRange := ratingRange{1, 4000}
@@ -142,37 +150,27 @@ func doWorkflow2(p partRatings, wf workflow, workflows map[string]workflow) uint
 	for _, r := range wf.rules {
 		pCopy := make(partRatings)
 		maps.Copy(pCopy, p)
+		rr := p[r.category]
 		if r.lessThan {
-			rr := p[r.category]
-			rr.max = r.value - 1
-			pCopy[r.category] = rr
-			rr = p[r.category]
-			rr.min = r.value
-			p[r.category] = rr
+			pCopy[r.category] = ratingRange{rr.min, r.value - 1}
+			p[r.category] = ratingRange{r.value, rr.max}
 		} else {
-			rr := p[r.category]
-			rr.min = r.value + 1
-			pCopy[r.category] = rr
-			rr = p[r.category]
-			rr.max = r.value
-			p[r.category] = rr
+			pCopy[r.category] = ratingRange{r.value + 1, rr.max}
+			p[r.category] = ratingRange{rr.min, r.value}
 		}
-		switch r.action {
-		case "A":
-			total += pCopy.totalCombos()
-		case "R":
-			total += 0
-		default:
-			total += doWorkflow2(pCopy, workflows[r.action], workflows)
-		}
+		total += processAction2(pCopy, r.action, workflows)
 	}
-	switch wf.finalAction {
-	case "A":
-		total += p.totalCombos()
-	case "R":
-		total += 0
-	default:
-		total += doWorkflow2(p, workflows[wf.finalAction], workflows)
-	}
+	total += processAction2(p, wf.finalAction, workflows)
 	return total
+}
+
+func processAction2(p partRatings, action string, workflows map[string]workflow) uint64 {
+	switch action {
+	case "A":
+		return p.permutations()
+	case "R":
+		return 0
+	default:
+		return doWorkflow2(p, workflows[action], workflows)
+	}
 }
