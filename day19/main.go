@@ -3,15 +3,16 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"strings"
 
 	"github.com/ghonzo/advent2023/common"
 )
 
-// Day 19:
+// Day 19: Aplenty
 // Part 1 answer: 449531
-// Part 2 answer:
+// Part 2 answer: 122756210763577
 func main() {
 	fmt.Println("Advent of Code 2023, Day 19")
 	lines := common.ReadStringsFromFile("input.txt")
@@ -99,6 +100,79 @@ func doWorkflow(p part, wf workflow, workflows map[string]workflow) bool {
 	}
 }
 
-func part2(lines []string) int {
-	return 0
+type ratingRange struct {
+	min, max int
+}
+
+type partRatings map[string]ratingRange
+
+func (pr partRatings) totalCombos() uint64 {
+	// Through trial and error I figured out this fits ... I'm sure there's a real name for it!
+	// avgOverallSum * permutations
+	var permutations uint64 = 1
+	for _, rr := range pr {
+		permutations *= uint64(rr.max - rr.min + 1)
+	}
+	return permutations
+}
+
+func part2(lines []string) uint64 {
+	workflows := make(map[string]workflow)
+	for _, line := range lines {
+		if len(line) == 0 {
+			break
+		}
+		leftIndex := strings.Index(line, "{")
+		wf := workflow{name: line[:leftIndex]}
+		ruleParts := strings.Split(line[leftIndex+1:len(line)-1], ",")
+		for _, ruleStr := range ruleParts[:len(ruleParts)-1] {
+			group := ruleRegex.FindStringSubmatch(ruleStr)
+			wf.rules = append(wf.rules, rule{group[1], group[2] == "<", common.Atoi(group[3]), group[4]})
+		}
+		wf.finalAction = ruleParts[len(ruleParts)-1]
+		workflows[wf.name] = wf
+	}
+	fullRange := ratingRange{1, 4000}
+	allParts := partRatings{"x": fullRange, "m": fullRange, "a": fullRange, "s": fullRange}
+	return doWorkflow2(allParts, workflows["in"], workflows)
+}
+
+func doWorkflow2(p partRatings, wf workflow, workflows map[string]workflow) uint64 {
+	var total uint64
+	for _, r := range wf.rules {
+		pCopy := make(partRatings)
+		maps.Copy(pCopy, p)
+		if r.lessThan {
+			rr := p[r.category]
+			rr.max = r.value - 1
+			pCopy[r.category] = rr
+			rr = p[r.category]
+			rr.min = r.value
+			p[r.category] = rr
+		} else {
+			rr := p[r.category]
+			rr.min = r.value + 1
+			pCopy[r.category] = rr
+			rr = p[r.category]
+			rr.max = r.value
+			p[r.category] = rr
+		}
+		switch r.action {
+		case "A":
+			total += pCopy.totalCombos()
+		case "R":
+			total += 0
+		default:
+			total += doWorkflow2(pCopy, workflows[r.action], workflows)
+		}
+	}
+	switch wf.finalAction {
+	case "A":
+		total += p.totalCombos()
+	case "R":
+		total += 0
+	default:
+		total += doWorkflow2(p, workflows[wf.finalAction], workflows)
+	}
+	return total
 }
