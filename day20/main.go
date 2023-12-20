@@ -10,12 +10,13 @@ import (
 
 // Day 20: Pulse Propagation
 // Part 1 answer: 818723272
-// Part 2 answer:
+// Part 2 answer: 243902373381257
 func main() {
 	fmt.Println("Advent of Code 2023, Day 20")
 	lines := common.ReadStringsFromFile("input.txt")
 	fmt.Printf("Part 1: %d\n", part1(lines))
 	fmt.Printf("Part 2: %d\n", part2(lines))
+	fmt.Println(common.LCM(3947, 4001, 3943, 3917))
 }
 
 type moduleDef struct {
@@ -171,7 +172,8 @@ func pressButton2(moduleDefMap map[string]moduleDef, moduleStateMap map[string]*
 	}
 	for len(pulses) > 0 {
 		p := pulses[0]
-		if p.dest == "rx" && !p.high {
+		if p.dest == "cn" && p.high && p.origin != "ch" && p.origin != "gh" && p.origin != "th" {
+			fmt.Println(p.origin)
 			return true
 		}
 		pulses = pulses[1:]
