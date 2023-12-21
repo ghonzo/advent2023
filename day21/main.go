@@ -7,9 +7,9 @@ import (
 	"github.com/ghonzo/advent2023/common"
 )
 
-// Day 21:
+// Day 21: Step Counter
 // Part 1 answer: 3562
-// Part 2 answer:
+// Part 2 answer: 592723929260582
 func main() {
 	fmt.Println("Advent of Code 2023, Day 21")
 	lines := common.ReadStringsFromFile("input.txt")
@@ -52,6 +52,14 @@ func part2(lines []string) int {
 	return numberOfPlotsInfinite(lines, 26501365)
 }
 
+type gridState struct {
+	count, prevCount, prevCount2 int
+	// if true, can eliminate points in this grid
+	closed bool
+	// if true, then count happened on an even number ... otherwise prevCount
+	even bool
+}
+
 func numberOfPlotsInfinite(lines []string, steps int) int {
 	g := common.ArraysGridFromLines(lines)
 	// Find the starting spot
@@ -63,21 +71,60 @@ func numberOfPlotsInfinite(lines []string, steps int) int {
 			break
 		}
 	}
+	grids := make(map[common.Point]*gridState)
 	sourcePoints := map[common.Point]bool{start: true}
 	destPoints := make(map[common.Point]bool)
 	size := g.Size()
 	for i := 0; i < steps; i++ {
+		gridsToUpdate := make(map[*gridState]bool)
 		for p := range sourcePoints {
 			for p2 := range p.SurroundingCardinals() {
+				if destPoints[p2] {
+					continue
+				}
+				gCoord := common.NewPoint(p2.X()/size.X(), p2.Y()/size.Y())
+				gs, ok := grids[gCoord]
+				if !ok {
+					gs = new(gridState)
+					grids[gCoord] = gs
+				} else if gs.closed {
+					continue
+				}
 				if v := g.Get(common.NewPoint(posMod(p2.X(), size.X()), posMod(p2.Y(), size.Y()))); v == '.' {
 					destPoints[p2] = true
+					gs.count++
+					gridsToUpdate[gs] = true
 				}
+			}
+		}
+		// See if we can close any of the grids
+		for gs := range gridsToUpdate {
+			if gs.count == gs.prevCount2 {
+				gs.closed = true
+				gs.even = (i%2 == 0)
+			} else {
+				gs.prevCount2 = gs.prevCount
+				gs.prevCount = gs.count
+				gs.count = 0
 			}
 		}
 		sourcePoints = destPoints
 		destPoints = make(map[common.Point]bool)
+		fmt.Println(i)
 	}
-	return len(sourcePoints)
+	var total int
+	for _, gs := range grids {
+		if gs.closed {
+			if (steps%2 == 0) != gs.even {
+				total += gs.count
+			} else {
+				total += gs.prevCount
+			}
+		} else {
+			total += gs.prevCount
+		}
+	}
+	return total
 }
 
 func posMod(a, b int) int {
