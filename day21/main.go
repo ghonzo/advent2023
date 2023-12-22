@@ -52,12 +52,9 @@ func part2(lines []string) int {
 	return numberOfPlotsInfinite(lines, 26501365)
 }
 
-type gridState struct {
-	count, prevCount, prevCount2 int
-	// if true, can eliminate points in this grid
-	closed bool
-	// if true, then count happened on an even number ... otherwise prevCount
-	even bool
+type growthPoint struct {
+	step  int
+	plots int
 }
 
 func numberOfPlotsInfinite(lines []string, steps int) int {
@@ -71,60 +68,33 @@ func numberOfPlotsInfinite(lines []string, steps int) int {
 			break
 		}
 	}
-	grids := make(map[common.Point]*gridState)
 	sourcePoints := map[common.Point]bool{start: true}
 	destPoints := make(map[common.Point]bool)
 	size := g.Size()
-	for i := 0; i < steps; i++ {
-		gridsToUpdate := make(map[*gridState]bool)
+	var growthPoints []growthPoint
+	// Find the points where we extend beyond the initial grid, twice
+	for i := 1; ; i++ {
 		for p := range sourcePoints {
 			for p2 := range p.SurroundingCardinals() {
 				if destPoints[p2] {
 					continue
 				}
-				gCoord := common.NewPoint(p2.X()/size.X(), p2.Y()/size.Y())
-				gs, ok := grids[gCoord]
-				if !ok {
-					gs = new(gridState)
-					grids[gCoord] = gs
-				} else if gs.closed {
-					continue
-				}
 				if v := g.Get(common.NewPoint(posMod(p2.X(), size.X()), posMod(p2.Y(), size.Y()))); v == '.' {
 					destPoints[p2] = true
-					gs.count++
-					gridsToUpdate[gs] = true
 				}
 			}
 		}
-		// See if we can close any of the grids
-		for gs := range gridsToUpdate {
-			if gs.count == gs.prevCount2 {
-				gs.closed = true
-				gs.even = (i%2 == 0)
-			} else {
-				gs.prevCount2 = gs.prevCount
-				gs.prevCount = gs.count
-				gs.count = 0
+		// Did we reach a growthPoint?
+		if i == size.X()/2 || i == 3*size.X()/2 || i == 5*size.X()/2 {
+			growthPoints = append(growthPoints, growthPoint{i, len(destPoints)})
+			// Do we have 3?
+			if len(growthPoints) == 3 {
+				return extrapolate(growthPoints, steps)
 			}
 		}
 		sourcePoints = destPoints
 		destPoints = make(map[common.Point]bool)
-		fmt.Println(i)
 	}
-	var total int
-	for _, gs := range grids {
-		if gs.closed {
-			if (steps%2 == 0) != gs.even {
-				total += gs.count
-			} else {
-				total += gs.prevCount
-			}
-		} else {
-			total += gs.prevCount
-		}
-	}
-	return total
 }
 
 func posMod(a, b int) int {
@@ -133,4 +103,12 @@ func posMod(a, b int) int {
 		return v + b
 	}
 	return v
+}
+
+// Used https://users.rowan.edu/~hassen/NumerAnalysis/Interpolation_and_Approximation.pdf to fit a quadratic equation
+func extrapolate(gp []growthPoint, steps int) int {
+	l0 := (steps - gp[1].step) * (steps - gp[2].step) / ((gp[0].step - gp[1].step) * (gp[0].step - gp[2].step))
+	l1 := (steps - gp[0].step) * (steps - gp[2].step) / ((gp[1].step - gp[0].step) * (gp[1].step - gp[2].step))
+	l2 := (steps - gp[0].step) * (steps - gp[1].step) / ((gp[2].step - gp[0].step) * (gp[2].step - gp[1].step))
+	return gp[0].plots*l0 + gp[1].plots*l1 + gp[2].plots*l2
 }
