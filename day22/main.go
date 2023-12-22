@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ghonzo/advent2023/common"
 )
 
@@ -19,14 +20,15 @@ func main() {
 	fmt.Printf("Part 2: %d\n", part2(lines))
 }
 
-type point3 [3]int
+type point3 [3]int // x, y, z
 
 type brick struct {
 	// start z-coord will always be less than or equal to end z-coord
 	start, end point3
-	restingOn  []*brick
+	restingOn  mapset.Set[*brick]
 }
 
+// Returns all points that the brick occupies
 func (b *brick) points() <-chan point3 {
 	ch := make(chan point3)
 	go func() {
@@ -48,8 +50,23 @@ func sortByZ(a, b *brick) int {
 
 func part1(lines []string) int {
 	bricks := readBricks(lines)
-	for {
-		var moved bool
+	settleBricks(bricks)
+	disintegrateSet := mapset.NewThreadUnsafeSet[*brick]()
+	disintegrateSet.Append(bricks...)
+	// We can't disintegrate bricks are supporting exactly one other brick
+	for _, b := range bricks {
+		if b.restingOn != nil && b.restingOn.Cardinality() == 1 {
+			disintegrateSet.RemoveAll(b.restingOn.ToSlice()...)
+		}
+	}
+	return disintegrateSet.Cardinality()
+}
+
+// Make the bricks fall until they settle and don't move anymore
+func settleBricks(bricks []*brick) {
+	moved := true
+	for moved {
+		moved = false
 		// Sort the bricks by z-coord
 		slices.SortFunc(bricks, sortByZ)
 		// Record where every brick is in 3d space
@@ -59,21 +76,7 @@ func part1(lines []string) int {
 			moved = b.fall(brickSpace) || moved
 		}
 		// If at least one moved, do it again
-		if !moved {
-			break
-		}
 	}
-	disintegrateSet := make(map[*brick]bool)
-	for _, b := range bricks {
-		disintegrateSet[b] = true
-	}
-	// We can't disintegrate bricks are supporting exactly one other brick
-	for _, b := range bricks {
-		if len(b.restingOn) == 1 {
-			delete(disintegrateSet, b.restingOn[0])
-		}
-	}
-	return len(disintegrateSet)
 }
 
 func readBricks(lines []string) []*brick {
@@ -104,15 +107,15 @@ func (b *brick) fall(brickSpace map[point3]*brick) bool {
 		// Move start and end down
 		b.start[2]--
 		b.end[2]--
-		var restingOn []*brick
+		restingOn := mapset.NewThreadUnsafeSet[*brick]()
 		for p := range b.points() {
 			// Are we occupying the space of another brick?
-			if otherBrick, found := brickSpace[p]; found && !slices.Contains(restingOn, otherBrick) {
-				restingOn = append(restingOn, otherBrick)
+			if otherBrick, found := brickSpace[p]; found {
+				restingOn.Add(otherBrick)
 			}
 		}
 		// If we are resting on at least one other brick, undo and remember
-		if len(restingOn) > 0 {
+		if !restingOn.IsEmpty() {
 			b.start[2]++
 			b.end[2]++
 			b.restingOn = restingOn
@@ -129,21 +132,7 @@ func (b *brick) fall(brickSpace map[point3]*brick) bool {
 
 func part2(lines []string) int {
 	bricks := readBricks(lines)
-	for {
-		var moved bool
-		// Sort the bricks by z-coord
-		slices.SortFunc(bricks, sortByZ)
-		// Record where every brick is in 3d space
-		brickSpace := make(map[point3]*brick)
-		// Now make each brick fall in z-coord
-		for _, b := range bricks {
-			moved = b.fall(brickSpace) || moved
-		}
-		// If at least one moved, do it again
-		if !moved {
-			break
-		}
-	}
+	settleBricks(bricks)
 	var total int
 	for _, b := range bricks {
 		total += countFall(b, bricks)
@@ -151,25 +140,23 @@ func part2(lines []string) int {
 	return total
 }
 
-func countFall(b *brick, bricks []*brick) int {
-	goneBricks := map[*brick]bool{b: true}
-outer:
-	for {
-	inner:
-		for _, b2 := range bricks {
-			if !goneBricks[b2] && len(b2.restingOn) > 0 {
-				// Check if all that this was resting on are gone
-				for _, b3 := range b2.restingOn {
-					if !goneBricks[b3] {
-						continue inner
-					}
-				}
-				// Yep, all gone, so this one should be added
-				goneBricks[b2] = true
-				continue outer
-			}
-		}
-		// Didn't add any
-		return len(goneBricks) - 1
+// How many bricks would ultimately fall if we removed the given brick
+func countFall(brickToRemove *brick, bricks []*brick) int {
+	goneBricks := mapset.NewThreadUnsafeSet[*brick]()
+	goneBricks.Add(brickToRemove)
+	for cascade(bricks, goneBricks) {
 	}
+	return goneBricks.Cardinality() - 1
+}
+
+// Returns true if a brick has been added to goneBricks, which means we have to do it again
+func cascade(bricks []*brick, goneBricks mapset.Set[*brick]) bool {
+	for _, b := range bricks {
+		if !goneBricks.Contains(b) && b.restingOn != nil && b.restingOn.IsSubset(goneBricks) {
+			// Yep all gone
+			goneBricks.Add(b)
+			return true
+		}
+	}
+	return false
 }
